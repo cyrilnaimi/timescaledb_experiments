@@ -12,7 +12,7 @@ from concurrent import futures
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 
-CONNECTION = "postgres://postgres:admin123@192.168.1.49:5432/timescaledb"
+CONNECTION = "postgres://postgres:admin123@172.16.15.136:5432/timescaledb"
 
 def create_sensors_table(conn):
     query_create_sensors_table = "CREATE TABLE sensors (id SERIAL PRIMARY KEY, type VARCHAR(50), location VARCHAR(50));"
@@ -80,7 +80,7 @@ def fast_insert(conn):
     # for sensors with ids 1-4
     ts = gnr_time_array()
     count=0
-    for id in range(1, 508, 1):
+    for id in range(1, 500, 1):
         print(f" --- sensor {id} ---- ")
         rng = gnr_rnd()
         sql = " INSERT INTO sensor_data (time, sensor_id, temperature, cpu) VALUES (%s, %s, %s, %s);"
@@ -131,7 +131,7 @@ def multi_th():
     ts = gnr_time_array()
     with futures.ThreadPoolExecutor(10) as ex:
         futs = []
-        for i in range(32,508,1):
+        for i in range(0,500,1):
             f = ex.submit(th_insert,
                           CONNECTION,
                           i,
@@ -141,15 +141,11 @@ def multi_th():
             print(f'thread finised for {f.result()}')
 
 
-
-
-
-
 def grabdata(start_date, end_date, bucket, sensor_id, conn):
     tic = time.perf_counter()
     cursor = conn.cursor()
     sql = """
-           SELECT time_bucket('%s minutes', time) AS timebucket, avg(temperature)
+           SELECT time_bucket('%s minutes', time) AS timebucket, percent(temperature, time)
            FROM sensor_data
            WHERE sensor_id = '%s' AND time between%s and %s
            GROUP BY timebucket
@@ -228,21 +224,37 @@ def main():
 
     ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
                      datetime.now(),
+                     6*60,
+                     24,
+                     conn)
+    blob1.append({'ts': ts1, 'd': d1, 'bucket' : 6*60})
+
+
+    ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
+                     datetime.now(),
+                     2*24*60,
+                     24,
+                     conn)
+    blob1.append({'ts': ts1, 'd': d1, 'bucket' : 2*24*60})
+
+
+    ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
+                     datetime.now(),
                      60,
-                     305,
+                     16,
                      conn)
 
     blob2 = [{'ts': ts1, 'd': d1, 'bucket' : 60}]
     ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
                      datetime.now(),
                      24*60,
-                     306,
+                     56,
                      conn)
     blob2.append({'ts': ts1, 'd': d1, 'bucket' : 24*60})
     ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
                      datetime.now(),
                      7*24*60,
-                     318,
+                     108,
                      conn)
     blob2.append({'ts': ts1, 'd': d1, 'bucket' : 7*24*60})
 
@@ -261,7 +273,7 @@ def main():
     ts1,d1 = grabdata(datetime.now() - timedelta(weeks=104),
                      datetime.now(),
                      7*24*60,
-                     98,
+                     77,
                      conn)
     blob3.append({'ts': ts1, 'd': d1, 'bucket' : 7*24*60})
 
